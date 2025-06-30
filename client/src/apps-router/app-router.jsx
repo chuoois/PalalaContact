@@ -7,6 +7,8 @@ import {
   ForgotPasswordPage
 } from '../pages';
 
+const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
 export const router = createBrowserRouter([
   {
     path: "/auth",
@@ -15,7 +17,7 @@ export const router = createBrowserRouter([
       {
         path: "signin",
         element: (
-          <GoogleOAuthProvider clientId="YOUR_GOOGLE_CLIENT_ID">
+          <GoogleOAuthProvider clientId={clientId}>
             <LoginPage />
           </GoogleOAuthProvider>
         ),
@@ -23,17 +25,15 @@ export const router = createBrowserRouter([
       {
         path: "signup",
         element: (
-          <GoogleOAuthProvider clientId="YOUR_GOOGLE_CLIENT_ID">
+          <GoogleOAuthProvider clientId={clientId}>
             <SignupPage />
           </GoogleOAuthProvider>
         ),
       },
       {
         path: "forgot-password",
-        element: (
-          <ForgotPasswordPage />
-        ),
+        element: <ForgotPasswordPage />,
       },
     ],
   },
-]); 
+]);

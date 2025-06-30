@@ -2,12 +2,14 @@ import { useState } from "react"
 import { Link } from "react-router-dom"
 import { GoogleLogin } from "@react-oauth/google"
 import { Formik, Form, Field, ErrorMessage } from "formik"
+import authService from "../../services/auth.services"
 import * as Yup from "yup"
 import toast from "react-hot-toast"
 
+
 // Validation schema
 const validationSchema = Yup.object({
-  fullName: Yup.string()
+  name: Yup.string()
     .min(2, "Họ tên phải có ít nhất 2 ký tự")
     .max(50, "Họ tên không được quá 50 ký tự")
     .required("Họ tên là bắt buộc"),
@@ -27,7 +29,7 @@ export const SignupForm = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const initialValues = {
-    fullName: "",
+    name: "",
     email: "",
     password: "",
     confirmPassword: "",
@@ -38,37 +40,37 @@ export const SignupForm = () => {
     try {
       const loadingToast = toast.loading("Đang tạo tài khoản...")
 
-      // Giả lập API call
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      const response = await authService.signup({
+        name: values.name,
+        email: values.email,
+        password: values.password,
+        comparePassword: values.confirmPassword,
+      })
 
       toast.dismiss(loadingToast)
 
-      // Giả lập thành công/thất bại
-      const isSuccess = Math.random() > 0.2
+      const successMessage = response.data.message
+      toast.success(successMessage, {
+        duration: 3000,
+      })
 
-      if (isSuccess) {
-        toast.success("Đăng ký thành công! 🎉", {
-          duration: 4000,
-        })
-        console.log("Đăng ký thành công:", values)
-        // Redirect to login or dashboard
-      } else {
-        toast.error("Email đã được sử dụng. Vui lòng chọn email khác!")
-      }
     } catch (error) {
-      toast.error("Có lỗi xảy ra. Vui lòng thử lại!")
-      console.error("Lỗi đăng ký:", error)
+      toast.dismiss()
+      const errorMessage = error.response?.data?.message
+      toast.error(errorMessage)
     } finally {
       setSubmitting(false)
     }
   }
 
-  const handleGoogleSuccess = (credentialResponse) => {
-    toast.success("Đăng ký Google thành công! 🎉", {
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    const response = await authService.signupGoogle(credentialResponse.credential);
+
+    toast.success("Đăng ký Google thành công!", {
       duration: 3000,
     })
-    console.log("Google Register Success:", credentialResponse)
-  }
+    }
 
   const handleGoogleError = () => {
     toast.error("Đăng ký Google thất bại!")
@@ -93,7 +95,7 @@ export const SignupForm = () => {
                     <Form>
                       {/* Full Name Field */}
                       <div className="mb-3">
-                        <label htmlFor="fullName" className="form-label fw-semibold">
+                        <label htmlFor="name" className="form-label fw-semibold">
                           <i className="bi bi-person me-2"></i>Họ và tên
                         </label>
                         <div className="input-group">
@@ -101,17 +103,16 @@ export const SignupForm = () => {
                             <i className="bi bi-person-circle text-muted"></i>
                           </span>
                           <Field
-                            id="fullName"
-                            name="fullName"
+                            id="name"
+                            name="name"
                             type="text"
-                            className={`form-control border-start-0 ${
-                              errors.fullName && touched.fullName ? "is-invalid" : ""
-                            }`}
+                            className={`form-control border-start-0 ${errors.name && touched.name ? "is-invalid" : ""
+                              }`}
                             placeholder="Nhập họ và tên"
                             style={{ boxShadow: "none" }}
                           />
                         </div>
-                        <ErrorMessage name="fullName" component="div" className="text-danger small mt-1" />
+                        <ErrorMessage name="name" component="div" className="text-danger small mt-1" />
                       </div>
 
                       {/* Email Field */}
@@ -127,9 +128,8 @@ export const SignupForm = () => {
                             id="email"
                             name="email"
                             type="email"
-                            className={`form-control border-start-0 ${
-                              errors.email && touched.email ? "is-invalid" : ""
-                            }`}
+                            className={`form-control border-start-0 ${errors.email && touched.email ? "is-invalid" : ""
+                              }`}
                             placeholder="Nhập email của bạn"
                             style={{ boxShadow: "none" }}
                           />
@@ -150,9 +150,8 @@ export const SignupForm = () => {
                             id="password"
                             name="password"
                             type={showPassword ? "text" : "password"}
-                            className={`form-control border-start-0 border-end-0 ${
-                              errors.password && touched.password ? "is-invalid" : ""
-                            }`}
+                            className={`form-control border-start-0 border-end-0 ${errors.password && touched.password ? "is-invalid" : ""
+                              }`}
                             placeholder="Nhập mật khẩu"
                             style={{ boxShadow: "none" }}
                           />
@@ -181,9 +180,8 @@ export const SignupForm = () => {
                             id="confirmPassword"
                             name="confirmPassword"
                             type={showConfirmPassword ? "text" : "password"}
-                            className={`form-control border-start-0 border-end-0 ${
-                              errors.confirmPassword && touched.confirmPassword ? "is-invalid" : ""
-                            }`}
+                            className={`form-control border-start-0 border-end-0 ${errors.confirmPassword && touched.confirmPassword ? "is-invalid" : ""
+                              }`}
                             placeholder="Nhập lại mật khẩu"
                             style={{ boxShadow: "none" }}
                           />
