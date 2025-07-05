@@ -65,12 +65,18 @@ export const SignupForm = () => {
 
 
   const handleGoogleSuccess = async (credentialResponse) => {
-    const response = await authService.signupGoogle(credentialResponse.credential);
-
-    toast.success("Đăng ký Google thành công!", {
-      duration: 3000,
-    })
+    try {
+      const response = await authService.signupGoogle(credentialResponse.credential)
+      const successMessage = response.data.message
+      toast.success(successMessage, {
+        duration: 3000,
+      })
+    } catch (error) {
+      toast.dismiss()
+      const errorMessage = error.response?.data?.message
+      toast.error(errorMessage)
     }
+  }
 
   const handleGoogleError = () => {
     toast.error("Đăng ký Google thất bại!")

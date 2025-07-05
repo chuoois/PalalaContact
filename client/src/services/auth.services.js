@@ -13,10 +13,19 @@ const authService = {
         return response;
     },
 
-    signupGoogle: async (token) => {
-        const response = await api.post('/signup-google', { token });
+    signupGoogle: async (tokenGoogle) => {
+        const response = await api.post('/signup-google', {
+            tokenId: tokenGoogle
+        });
         return response;
     },
+
+    verifyEmail: async (token, email) => {
+        const response = await api.get('/verify-email', {
+            params: { token, email }
+        });
+        return response;
+    }
 };
 
 export default authService;

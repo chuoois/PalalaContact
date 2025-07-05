@@ -12,5 +12,7 @@ export const env = {
     FRONTEND_URL: process.env.FRONTEND_URL,
     VITE_GOOGLE_CLIENT_ID: process.env.VITE_GOOGLE_CLIENT_ID,
     EMAIL_USERNAME: process.env.EMAIL_USERNAME,
-    EMAIL_PASSWORD: process.env.EMAIL_PASSWORD
+    EMAIL_PASSWORD: process.env.EMAIL_PASSWORD,
+    SMTP_PORT: process.env.SMTP_PORT,
+    SMTP_HOST: process.env.SMTP_HOST
 };

@@ -4,7 +4,7 @@ const userSchema = mongoose.Schema(
     {
         name: { type: String, required: true },
         email: { type: String, required: true },
-        password: { type: String, required: true },
+        password: { type: String },
         address: {
             street: { type: String },
             city: { type: String },
@@ -12,9 +12,11 @@ const userSchema = mongoose.Schema(
         },
         phone: { type: String },
         picture: { type: String },
+        verificationToken: { type: String },
+        verificationTokenExpiry: { type: Date },
         status: {
             type: String,
-            enum: ['Active', 'Inactive', 'Pending'],
+            enum: ['Active', 'Suspended', 'Pending'],
         },
         role: {
             type: String,
