@@ -54,7 +54,7 @@ export const ForgotPasswordForm = () => {
       const isSuccess = Math.random() > 0.2
 
       if (isSuccess) {
-        toast.success("Email đặt lại mật khẩu đã được gửi! 📧", {
+        toast.success("Email đặt lại mật khẩu đã được gửi!", {
           duration: 4000,
         })
         setEmail(values.email)
@@ -321,7 +321,7 @@ export const ForgotPasswordForm = () => {
                         <button
                           type="submit"
                           disabled={isSubmitting}
-                          className="btn btn-success w-100 py-2 fw-semibold"
+                          className="btn btn-primary w-100 py-2 fw-semibold"
                         >
                           {isSubmitting ? (
                             <>

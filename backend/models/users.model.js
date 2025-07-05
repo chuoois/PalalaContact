@@ -4,21 +4,28 @@ const userSchema = mongoose.Schema(
     {
         name: { type: String, required: true },
         email: { type: String, required: true },
-        password: { type: String, required: true },
+        password: { type: String },
         address: {
-            street: { type: String, required: true },
+            street: { type: String },
             city: { type: String },
             country: { type: String },
         },
         phone: { type: String },
+        picture: { type: String },
+        verificationToken: { type: String },
+        verificationTokenExpiry: { type: Date },
+        status: {
+            type: String,
+            enum: ['Active', 'Suspended', 'Pending'],
+        },
         role: {
             type: String,
-            enum: ['customer', 'admin']
+            enum: ['user', 'admin']
         }
     },
     { timestamps: true }
 );
 
-const User = mongoose.model('User', userSchema, 'users');
+const Users = mongoose.model('Users', userSchema, 'users');
 
-module.exports = User;
+module.exports = Users;

@@ -3,6 +3,11 @@ const router = express.Router();
 const { authController } = require('../controller');
 const { authMiddleware } = require('../middleware');
 
-router.post('/auth/signup', authMiddleware.checkEmailExists, authController.signup);
+// Public routes 
+router.post('/auth/signup', authController.signup);
+router.post('/auth/signin', authController.signin);
+router.post('/auth/signup-google', authController.signupGoogle);
+// Email verification routes
+router.get("/auth/verify-email", authController.verifyEmail);
 
 module.exports = router;
