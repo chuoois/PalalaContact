@@ -12,8 +12,6 @@ const userSchema = mongoose.Schema(
         },
         phone: { type: String },
         picture: { type: String },
-        verificationToken: { type: String },
-        verificationTokenExpiry: { type: Date },
         status: {
             type: String,
             enum: ['Active', 'Suspended', 'Pending'],

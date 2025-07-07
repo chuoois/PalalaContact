@@ -1,59 +1,98 @@
 import { useState } from "react"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { GoogleLogin } from "@react-oauth/google"
 import { Formik, Form, Field, ErrorMessage } from "formik"
 import * as Yup from "yup"
 import toast from "react-hot-toast"
+import authService from "../../services/auth.services"
 
 // Validation schema
 const validationSchema = Yup.object({
     email: Yup.string().email("Email không hợp lệ").required("Email là bắt buộc"),
     password: Yup.string().min(6, "Mật khẩu phải có ít nhất 6 ký tự").required("Mật khẩu là bắt buộc"),
-    rememberMe: Yup.boolean(),
 })
 
 export const LoginForm = () => {
+    const navigate = useNavigate()
     const [showPassword, setShowPassword] = useState(false)
 
     const initialValues = {
         email: "",
         password: "",
-        rememberMe: false,
     }
 
     const handleSubmit = async (values, { setSubmitting }) => {
         try {
             const loadingToast = toast.loading("Đang đăng nhập...")
 
-            // Giả lập API call
-            await new Promise((resolve) => setTimeout(resolve, 1500))
+            const response = await authService.signin({
+                email: values.email,
+                password: values.password
+            })
 
             toast.dismiss(loadingToast)
 
-            // Giả lập thành công/thất bại
-            const isSuccess = Math.random() > 0.3
-
-            if (isSuccess) {
-                toast.success("Đăng nhập thành công! 🎉", {
+            // Kiểm tra response success
+            if (response.data && response.data.success) {
+                toast.success(response.data.message, {
                     duration: 3000,
                 })
-                console.log("Đăng nhập thành công:", values)
+
+                // Lưu thông tin user vào sessionStorage hoặc context nếu cần
+                if (response.data.user) {
+                    sessionStorage.setItem('token', response.data.user.token)
+                }
+
+                // Redirect tới trang chính hoặc dashboard
+                setTimeout(() => {
+                    navigate('/home') // hoặc trang bạn muốn redirect
+                }, 1000)
+
             } else {
-                toast.error("Email hoặc mật khẩu không đúng!")
+                toast.error(response.data?.message || "Có lỗi xảy ra khi tạo tài khoản")
             }
+
         } catch (error) {
-            toast.error("Có lỗi xảy ra. Vui lòng thử lại!")
-            console.error("Lỗi đăng nhập:", error)
+            toast.dismiss()
+            console.error('Error in handleStepTwo:', error)
+            const errorMessage = error.response?.data?.message || "Có lỗi xảy ra khi tạo tài khoản"
+            toast.error(errorMessage)
         } finally {
             setSubmitting(false)
         }
     }
 
-    const handleGoogleSuccess = (credentialResponse) => {
-        toast.success("Đăng nhập Google thành công! 🎉", {
-            duration: 3000,
-        })
-        console.log("Google Login Success:", credentialResponse)
+    const handleGoogleSuccess = async (credentialResponse) => {
+        try {
+            const loadingToast = toast.loading("Đang đăng nhập với Google...")
+
+            const response = await authService.signinGoogle(credentialResponse.credential)
+
+            toast.dismiss(loadingToast)
+
+            if (response.data && response.data.success) {
+                toast.success(response.data.message, {
+                    duration: 3000,
+                })
+
+                // Lưu thông tin user nếu cần
+                if (response.data.user) {
+                    sessionStorage.setItem('token', response.data.user.token)
+                }
+
+                // Redirect
+                setTimeout(() => {
+                    navigate('/home')
+                }, 1000)
+            } else {
+                toast.error(response.data?.message || "Đăng ký Google thất bại")
+            }
+        } catch (error) {
+            toast.dismiss()
+            console.error('Error in handleGoogleSuccess:', error)
+            const errorMessage = error.response?.data?.message || "Đăng ký Google thất bại"
+            toast.error(errorMessage)
+        }
     }
 
     const handleGoogleError = () => {
@@ -132,14 +171,6 @@ export const LoginForm = () => {
                                                     </button>
                                                 </div>
                                                 <ErrorMessage name="password" component="div" className="text-danger small mt-1" />
-                                            </div>
-
-                                            {/* Remember Me */}
-                                            <div className="form-check mb-4">
-                                                <Field id="rememberMe" name="rememberMe" type="checkbox" className="form-check-input" />
-                                                <label htmlFor="rememberMe" className="form-check-label">
-                                                    Ghi nhớ đăng nhập
-                                                </label>
                                             </div>
 
                                             {/* Submit Button */}

@@ -1,48 +1,146 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
 const { env } = require('../configs/environment');
 const { helpersformail } = require('../helpers');
 const { OAuth2Client } = require('google-auth-library');
 const { StatusCodes } = require('http-status-codes');
 const {
-    Users
+    Users,
+    OTP
 } = require('../models');
 
 const client = new OAuth2Client(env.VITE_GOOGLE_CLIENT_ID);
 
-const signup = async (req, res) => {
-    try {
-        const { name, email, password, comparePassword } = req.body;
+// Tạo OTP 6 số
+const generateOTP = () => {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+};
 
-        // all the data should exists
-        if (!(name && email && password && comparePassword)) {
+// Gửi OTP đến email
+const sendOTP = async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
             return res.status(StatusCodes.BAD_REQUEST).json({
-                message: 'Tất cả các trường là bắt buộc',
+                message: 'Email là bắt buộc',
             });
         }
 
-        // check if passwords match
+        // Kiểm tra email đã tồn tại chưa
+        const existingUser = await Users.findOne({ email: email });
+        if (existingUser) {
+            return res.status(StatusCodes.CONFLICT).json({
+                message: 'Email đã được sử dụng',
+            });
+        }
+
+        // Tạo OTP
+        const otpCode = generateOTP();
+
+        // Xóa OTP cũ nếu có (do unique constraint)
+        await OTP.deleteOne({ email: email });
+
+        // Lưu OTP vào database OTP
+        await OTP.create({
+            email: email,
+            otpCode: otpCode,
+            attempts: 0
+        });
+
+        // Gửi OTP qua email
+        const emailHTML = helpersformail.getOTPEmailTemplate(email, otpCode);
+        const emailResponse = await helpersformail.sendMail({
+            email: email,
+            subject: 'Mã xác thực OTP',
+            html: emailHTML,
+        });
+
+        if (!emailResponse.success) {
+            return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+                message: 'Lỗi trong quá trình gửi OTP',
+                error: emailResponse.error,
+            });
+        }
+
+        res.status(StatusCodes.OK).json({
+            message: 'OTP đã được gửi đến email của bạn',
+            email: email
+        });
+
+    } catch (error) {
+        console.error('Error in sendOTP:', error);
+        res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+            message: 'Lỗi trong quá trình gửi OTP',
+            error: error.message,
+        });
+    }
+};
+
+const signup = async (req, res) => {
+    try {
+        const { name, email, password, comparePassword, otp } = req.body;
+
+        // Kiểm tra tất cả các trường bắt buộc
+        if (!(name && email && password && comparePassword && otp)) {
+            return res.status(StatusCodes.BAD_REQUEST).json({
+                message: 'Tất cả các trường là bắt buộc (bao gồm OTP)',
+            });
+        }
+
+        // Kiểm tra mật khẩu khớp
         if (password !== comparePassword) {
             return res.status(StatusCodes.BAD_REQUEST).json({
                 message: 'Mật khẩu và xác nhận mật khẩu không khớp',
             });
         }
 
-        // check if user already exists
+        // Kiểm tra email đã tồn tại chưa
         const existingUser = await Users.findOne({ email: email });
         if (existingUser) {
             return res.status(StatusCodes.CONFLICT).json({
-                message: 'Người dùng đã tồn tại',
+                message: 'Email đã được sử dụng',
             });
         }
 
-        // encrypt the password
+        // Tìm OTP trong database
+        const otpRecord = await OTP.findOne({
+            email: email
+        });
+
+        if (!otpRecord) {
+            return res.status(StatusCodes.BAD_REQUEST).json({
+                message: 'Không tìm thấy yêu cầu OTP cho email này hoặc OTP đã hết hạn',
+            });
+        }
+
+        // Kiểm tra số lần thử
+        if (otpRecord.attempts >= 5) {
+            // Xóa OTP đã quá số lần thử
+            await OTP.deleteOne({ _id: otpRecord._id });
+            return res.status(StatusCodes.BAD_REQUEST).json({
+                message: 'OTP đã bị khóa do nhập sai quá nhiều lần',
+            });
+        }
+
+        // Kiểm tra OTP đúng
+        if (otpRecord.otpCode !== otp) {
+            // Tăng số lần thử
+            await OTP.updateOne(
+                { _id: otpRecord._id },
+                { $inc: { attempts: 1 } }
+            );
+
+            const remainingAttempts = 5 - (otpRecord.attempts + 1);
+            return res.status(StatusCodes.BAD_REQUEST).json({
+                message: `OTP không đúng. Còn ${remainingAttempts} lần thử`,
+            });
+        }
+
+        // Mã hóa mật khẩu
         const myEncPassword = await bcrypt.hash(password, 10);
-        // generate a verification token
-        const verificationToken = crypto.randomBytes(32).toString('hex');
-        const verificationTokenExpiry = Date.now() + 24 * 60 * 60 * 1000;
-        // create a new user
+
+        // Tạo user mới
         const user = await Users.create({
             name,
             email,
@@ -54,91 +152,109 @@ const signup = async (req, res) => {
             },
             phone: '',
             picture: '',
-            status: 'Pending',
+            status: 'Active',
             role: 'user',
-            verificationToken,
-            verificationTokenExpiry
-        });
-        // create verification link
-        const verificationLink = `${env.FRONTEND_URL}/auth/verify-email?token=${verificationToken}&email=${encodeURIComponent(email)}`;
-        //send verification email
-        const emailSent = await helpersformail.getVerificationEmailTemplate(name, verificationLink);
-        const emailResponse = await helpersformail.sendMail({
-            email: user.email,
-            subject: 'Xác thực tài khoản',
-            html: emailSent,
         });
 
-        if (!emailResponse.success) {
-            return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-                message: 'Lỗi trong quá trình tạo tài khoản',
-                error: emailResponse.error,
-            });
-        }
+        // Xóa OTP sau khi đăng ký thành công
+        await OTP.deleteOne({ _id: otpRecord._id });
 
-        // generate a token
+        // Tạo token
         const token = jwt.sign(
             { userId: user._id, email: user.email },
             env.JWT_SECRET,
             { expiresIn: env.ACCESS_TOKEN_EXPIRY }
         );
 
-        user.token = token;
-        user.password = undefined;
+        // Tạo object user để trả về (không bao gồm password)
+        const userResponse = {
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            address: user.address,
+            phone: user.phone,
+            picture: user.picture,
+            status: user.status,
+            role: user.role,
+            token: token,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt
+        };
 
         res.status(StatusCodes.CREATED).json({
+            success: true,
             message: 'Đăng ký thành công',
-            user,
+            user: userResponse,
         });
 
     } catch (error) {
+        console.error('Error in signup:', error);
         res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+            success: false,
             message: 'Lỗi trong quá trình đăng ký',
             error: error.message,
         });
     }
 };
 
-const verifyEmail = async (req, res) => {
+// Xác thực OTP (nếu cần endpoint riêng)
+const verifyOTP = async (req, res) => {
     try {
-        const { token, email } = req.query
+        const { email, otp } = req.body;
 
-        if (!token || !email) {
+        if (!email || !otp) {
             return res.status(StatusCodes.BAD_REQUEST).json({
-                message: "Token và email là bắt buộc",
-            })
+                message: 'Email và OTP là bắt buộc',
+            });
         }
 
-        // find user with verification token
-        const user = await Users.findOne({
-            email: decodeURIComponent(email),
-            verificationToken: token,
-            verificationTokenExpiry: { $gt: new Date() },
-        })
-        console.log("user", user)
+        const otpRecord = await OTP.findOne({
+            email: email
+        });
 
-        if (!user) {
+        if (!otpRecord) {
             return res.status(StatusCodes.BAD_REQUEST).json({
-                message: "Token xác nhận không hợp lệ hoặc đã hết hạn",
-            })
+                message: 'Không tìm thấy yêu cầu OTP cho email này hoặc OTP đã hết hạn',
+            });
         }
 
-        // update user status
-        user.status = "Active"
-        user.verificationToken = undefined
-        user.verificationTokenExpiry = undefined
-        await user.save()
+        // Kiểm tra số lần thử
+        if (otpRecord.attempts >= 5) {
+            // Xóa OTP đã quá số lần thử
+            await OTP.deleteOne({ _id: otpRecord._id });
+            return res.status(StatusCodes.BAD_REQUEST).json({
+                message: 'OTP đã bị khóa do nhập sai quá nhiều lần',
+            });
+        }
+
+        if (otpRecord.otpCode !== otp) {
+            // Tăng số lần thử
+            await OTP.updateOne(
+                { _id: otpRecord._id },
+                { $inc: { attempts: 1 } }
+            );
+
+            const remainingAttempts = 5 - (otpRecord.attempts + 1);
+            return res.status(StatusCodes.BAD_REQUEST).json({
+                message: `OTP không đúng. Còn ${remainingAttempts} lần thử`,
+            });
+        }
 
         res.status(StatusCodes.OK).json({
-            message: "Xác nhận email thành công! Tài khoản của bạn đã được kích hoạt.",
-        })
+            success: true,
+            message: 'OTP xác thực thành công',
+            email: email
+        });
+
     } catch (error) {
+        console.error('Error in verifyOTP:', error);
         res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-            message: "Lỗi trong quá trình xác nhận email",
+            success: false,
+            message: 'Lỗi trong quá trình xác thực OTP',
             error: error.message,
-        })
+        });
     }
-}
+};
 
 const signupGoogle = async (req, res) => {
     try {
@@ -184,13 +300,31 @@ const signupGoogle = async (req, res) => {
             role: 'user',
         });
 
+        // Tạo object user để trả về (không bao gồm password)
+        const userResponse = {
+            _id: newUser._id,
+            name: newUser.name,
+            email: newUser.email,
+            googleId: newUser.googleId,
+            address: newUser.address,
+            phone: newUser.phone,
+            picture: newUser.picture,
+            status: newUser.status,
+            role: newUser.role,
+            createdAt: newUser.createdAt,
+            updatedAt: newUser.updatedAt
+        };
+
         res.status(StatusCodes.CREATED).json({
+            success: true,
             message: 'Đăng ký thành công với Google',
-            user: newUser,
+            user: userResponse,
         });
 
     } catch (error) {
+        console.error('Error in signupGoogle:', error);
         res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+            success: false,
             message: 'Lỗi trong quá trình đăng ký với Google',
             error: error.message,
         });
@@ -219,22 +353,116 @@ const signin = async (req, res) => {
                 { expiresIn: env.ACCESS_TOKEN_EXPIRY }
             );
 
-            user.token = token;
-            user.password = undefined;
+            // Tạo object user để trả về (không bao gồm password)
+            const userResponse = {
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                address: user.address,
+                phone: user.phone,
+                picture: user.picture,
+                status: user.status,
+                role: user.role,
+                token: token,
+                createdAt: user.createdAt,
+                updatedAt: user.updatedAt
+            };
 
             res.status(StatusCodes.OK).json({
+                success: true,
                 message: 'Đăng nhập thành công',
-                user,
+                user: userResponse,
             });
         } else {
             res.status(StatusCodes.UNAUTHORIZED).json({
+                success: false,
                 message: 'Email hoặc mật khẩu không đúng',
             });
         }
 
     } catch (error) {
+        console.error('Error in signin:', error);
         res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+            success: false,
             message: 'Lỗi trong quá trình đăng nhập',
+            error: error.message,
+        });
+    }
+};
+
+const signinGoogle = async (req, res) => {
+    try {
+        const { idToken } = req.body;
+
+        if (!idToken) {
+            return res.status(StatusCodes.BAD_REQUEST).json({
+                message: 'ID token là bắt buộc',
+            });
+        }
+
+        // Verify the ID token with Google
+        const ticket = await client.verifyIdToken({
+            idToken: idToken,
+            audience: env.GOOGLE_CLIENT_ID,
+        });
+
+        const { email, name, picture, sub: googleId } = ticket.getPayload();
+
+        // Check if user exists
+        let user = await Users.findOne({ email });
+
+        if (!user) {
+            // Create new user if not exists
+            user = await Users.create({
+                name,
+                email,
+                googleId,
+                password: '',
+                address: {
+                    street: '',
+                    city: '',
+                    country: '',
+                },
+                phone: '',
+                picture: picture || '',
+                status: 'Active',
+                role: 'user',
+            });
+        }
+
+        // Generate a token
+        const token = jwt.sign(
+            { userId: user._id, email: user.email },
+            env.JWT_SECRET,
+            { expiresIn: env.ACCESS_TOKEN_EXPIRY }
+        );
+
+        // Tạo object user để trả về (không bao gồm password)
+        const userResponse = {
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            address: user.address,
+            phone: user.phone,
+            picture: user.picture,
+            status: user.status,
+            role: user.role,
+            token: token,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt
+        };
+
+        res.status(StatusCodes.OK).json({
+            success: true,
+            message: 'Đăng nhập Google thành công',
+            user: userResponse,
+        });
+
+    } catch (error) {
+        console.error('Error in signinGoogle:', error);
+        res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+            success: false,
+            message: 'Lỗi trong quá trình đăng nhập Google',
             error: error.message,
         });
     }
@@ -252,7 +480,7 @@ const forgotPassword = async (req, res) => {
         }
 
         // check if user exists
-        const user = await Users.findOne({ email }); // Fixed: Users instead of User
+        const user = await Users.findOne({ email });
 
         if (!user) {
             return res.status(StatusCodes.NOT_FOUND).json({
@@ -260,14 +488,34 @@ const forgotPassword = async (req, res) => {
             });
         }
 
-        // Here you would typically send a reset password link to the user's email
-        // For simplicity, we will just return a success message
+        // Tạo newPassword
+        const newPassword = Math.random().toString(36).slice(-8);
+        // Mã hóa mật khẩu mới
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        // Cập nhật mật khẩu mới cho người dùng
+        await Users.updateOne({ email }, { password: hashedPassword });
+        // Gửi email thông báo mật khẩu mới
+        const emailHTML = helpersformail.getForgotPasswordEmailTemplate(email, newPassword);
+        const emailResponse = await helpersformail.sendMail({
+            email: email,
+            subject: 'Mật khẩu mới',
+            html: emailHTML,
+        });
+        if (!emailResponse.success) {
+            return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+                message: 'Lỗi trong quá trình gửi email',
+                error: emailResponse.error,
+            });
+        }
         res.status(StatusCodes.OK).json({
-            message: 'Đã gửi liên kết đặt lại mật khẩu đến email của bạn',
+            success: true,
+            message: 'Mật khẩu mới đã được gửi đến email của bạn',
         });
 
     } catch (error) {
+        console.error('Error in forgotPassword:', error);
         res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+            success: false,
             message: 'Lỗi trong quá trình đặt lại mật khẩu',
             error: error.message,
         });
@@ -275,9 +523,11 @@ const forgotPassword = async (req, res) => {
 };
 
 module.exports = {
+    sendOTP,
     signup,
     signin,
     forgotPassword,
     signupGoogle,
-    verifyEmail
+    signinGoogle,
+    verifyOTP
 };

@@ -1,11 +1,13 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate  } from "react-router-dom";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { AuthLayout } from '../layouts';
+import { ProtectedRoute } from '../apps-router/protected-router';
 import {
   LoginPage,
   SignupPage,
   ForgotPasswordPage,
-  VerifyEmailPage
+  PrivacyPolicyPage,
+  TermsOfServicePage,
 } from '../pages';
 
 const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -32,13 +34,35 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: "verify-email",
-        element: <VerifyEmailPage />,
-      },
-      {
         path: "forgot-password",
         element: <ForgotPasswordPage />,
       },
+      {
+        path: "privacy-policy",
+        element: <PrivacyPolicyPage />,
+      },
+      {
+        path: "terms-of-service",
+        element: <TermsOfServicePage />,
+      },
     ],
+  },
+  // Các route được bảo vệ
+  {
+    path: "/home",
+    element: (
+      <ProtectedRoute>
+        <h1>Home Page</h1>
+      </ProtectedRoute>
+    ),
+  },
+  // Route mặc định chuyển đến login
+  {
+    path: "/",
+    element: (
+      <ProtectedRoute>
+        <Navigate to="/auth/signin" replace />
+      </ProtectedRoute>
+    ),
   },
 ]);

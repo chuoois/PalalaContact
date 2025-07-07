@@ -3,129 +3,43 @@ import { Link } from "react-router-dom"
 import { Formik, Form, Field, ErrorMessage } from "formik"
 import * as Yup from "yup"
 import toast from "react-hot-toast"
+import authService from "../../services/auth.services" 
 
 // Validation schema
 const emailSchema = Yup.object({
   email: Yup.string().email("Email không hợp lệ").required("Email là bắt buộc"),
 })
 
-const resetSchema = Yup.object({
-  code: Yup.string()
-    .length(6, "Mã xác thực phải có 6 ký tự")
-    .matches(/^\d+$/, "Mã xác thực chỉ chứa số")
-    .required("Mã xác thực là bắt buộc"),
-  newPassword: Yup.string()
-    .min(6, "Mật khẩu phải có ít nhất 6 ký tự")
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, "Mật khẩu phải có ít nhất 1 chữ hoa, 1 chữ thường và 1 số")
-    .required("Mật khẩu mới là bắt buộc"),
-  confirmPassword: Yup.string()
-    .oneOf([Yup.ref("newPassword"), null], "Mật khẩu xác nhận không khớp")
-    .required("Xác nhận mật khẩu là bắt buộc"),
-})
-
 export const ForgotPasswordForm = () => {
-  const [step, setStep] = useState(1) // 1: Enter email, 2: Enter code & new password
-  const [email, setEmail] = useState("")
-  const [showNewPassword, setShowNewPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [countdown, setCountdown] = useState(0)
+  const [isSuccess, setIsSuccess] = useState(false)
 
   const emailInitialValues = {
     email: "",
   }
 
-  const resetInitialValues = {
-    code: "",
-    newPassword: "",
-    confirmPassword: "",
-  }
-
-  // Handle send reset email
-  const handleSendEmail = async (values, { setSubmitting }) => {
+  // Handle send new password via email
+  const handleSendNewPassword = async (values, { setSubmitting }) => {
     try {
-      const loadingToast = toast.loading("Đang gửi email...")
+      const loadingToast = toast.loading("Đang tạo mật khẩu mới...")
 
-      // Giả lập API call
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      const response = await authService.forgotPassword(values.email)
 
       toast.dismiss(loadingToast)
 
-      // Giả lập thành công/thất bại
-      const isSuccess = Math.random() > 0.2
-
-      if (isSuccess) {
-        toast.success("Email đặt lại mật khẩu đã được gửi!", {
-          duration: 4000,
+      if (response.data && response.data.success) {
+        toast.success("Mật khẩu mới đã được gửi về email của bạn!", {
+          duration: 5000,
         })
-        setEmail(values.email)
-        setStep(2)
-        startCountdown()
-        console.log("Email sent to:", values.email)
+        setIsSuccess(true)
       } else {
-        toast.error("Email không tồn tại trong hệ thống!")
+        toast.error(response.data?.message || "Có lỗi xảy ra!")
       }
     } catch (error) {
+      toast.dismiss()
+      console.error("Error in handleSendNewPassword:", error)
       toast.error("Có lỗi xảy ra. Vui lòng thử lại!")
-      console.error("Send email error:", error)
     } finally {
       setSubmitting(false)
-    }
-  }
-
-  // Handle reset password
-  const handleResetPassword = async (values, { setSubmitting }) => {
-    try {
-      const loadingToast = toast.loading("Đang đặt lại mật khẩu...")
-
-      // Giả lập API call
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      toast.dismiss(loadingToast)
-
-      // Giả lập thành công/thất bại
-      const isSuccess = Math.random() > 0.3
-
-      if (isSuccess) {
-        toast.success("Đặt lại mật khẩu thành công! 🎉", {
-          duration: 4000,
-        })
-        console.log("Password reset successful:", { email, ...values })
-        // Redirect to login
-      } else {
-        toast.error("Mã xác thực không đúng hoặc đã hết hạn!")
-      }
-    } catch (error) {
-      toast.error("Có lỗi xảy ra. Vui lòng thử lại!")
-      console.error("Reset password error:", error)
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  // Countdown for resend email
-  const startCountdown = () => {
-    setCountdown(60)
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer)
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-  }
-
-  // Resend email
-  const handleResendEmail = async () => {
-    try {
-      const loadingToast = toast.loading("Đang gửi lại email...")
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      toast.dismiss(loadingToast)
-      toast.success("Email đã được gửi lại!")
-      startCountdown()
-    } catch {
-      toast.error("Không thể gửi lại email!")
     }
   }
 
@@ -137,20 +51,28 @@ export const ForgotPasswordForm = () => {
             {/* Header */}
             <div className="text-center mb-4">
               <div className="mb-3">
-                <i className="bi bi-shield-lock display-4 text-primary"></i>
+                <i className={`bi ${isSuccess ? 'bi-check-circle-fill text-success' : 'bi-shield-lock text-primary'} display-4`}></i>
               </div>
-              <h1 className="display-6 fw-bold text-dark mb-2">{step === 1 ? "Quên mật khẩu?" : "Đặt lại mật khẩu"}</h1>
+              <h1 className="display-6 fw-bold text-dark mb-2">
+                {isSuccess ? "Thành công!" : "Quên mật khẩu?"}
+              </h1>
               <p className="text-muted">
-                {step === 1 ? "Nhập email của bạn để nhận link đặt lại mật khẩu" : "Nhập mã xác thực và mật khẩu mới"}
+                {isSuccess 
+                  ? "Mật khẩu mới đã được gửi đến email của bạn" 
+                  : "Nhập email để nhận mật khẩu mới"}
               </p>
             </div>
 
             {/* Forgot Password Card */}
             <div className="card border-1">
               <div className="card-body p-4">
-                {step === 1 ? (
-                  // Step 1: Enter Email
-                  <Formik initialValues={emailInitialValues} validationSchema={emailSchema} onSubmit={handleSendEmail}>
+                {!isSuccess ? (
+                  // Email Input Form
+                  <Formik 
+                    initialValues={emailInitialValues} 
+                    validationSchema={emailSchema} 
+                    onSubmit={handleSendNewPassword}
+                  >
                     {({ isSubmitting, errors, touched }) => (
                       <Form>
                         {/* Email Field */}
@@ -187,12 +109,12 @@ export const ForgotPasswordForm = () => {
                               <span className="spinner-border spinner-border-sm me-2" role="status">
                                 <span className="visually-hidden">Loading...</span>
                               </span>
-                              Đang gửi email...
+                              Đang tạo mật khẩu mới...
                             </>
                           ) : (
                             <>
                               <i className="bi bi-send me-2"></i>
-                              Gửi email đặt lại
+                              Gửi mật khẩu mới
                             </>
                           )}
                         </button>
@@ -200,156 +122,25 @@ export const ForgotPasswordForm = () => {
                     )}
                   </Formik>
                 ) : (
-                  // Step 2: Enter Code & New Password
-                  <Formik
-                    initialValues={resetInitialValues}
-                    validationSchema={resetSchema}
-                    onSubmit={handleResetPassword}
-                  >
-                    {({ isSubmitting, errors, touched }) => (
-                      <Form>
-                        {/* Email Display */}
-                        <div className="alert alert-info d-flex align-items-center mb-4">
-                          <i className="bi bi-info-circle me-2"></i>
-                          <small>
-                            Mã xác thực đã được gửi đến: <strong>{email}</strong>
-                          </small>
-                        </div>
+                  // Success Message
+                  <div className="text-center">
+                    <div className="alert alert-success d-flex align-items-center mb-4">
+                      <i className="bi bi-check-circle me-2"></i>
+                      <div>
+                        <strong>Mật khẩu mới đã được gửi!</strong>
+                        <br />
+                        <small>Vui lòng kiểm tra email và sử dụng mật khẩu mới để đăng nhập</small>
+                      </div>
+                    </div>
 
-                        {/* Verification Code */}
-                        <div className="mb-3">
-                          <label htmlFor="code" className="form-label fw-semibold">
-                            <i className="bi bi-key me-2"></i>Mã xác thực
-                          </label>
-                          <div className="input-group">
-                            <span className="input-group-text bg-light border-end-0">
-                              <i className="bi bi-shield-check text-muted"></i>
-                            </span>
-                            <Field
-                              id="code"
-                              name="code"
-                              type="text"
-                              maxLength="6"
-                              className={`form-control border-start-0 text-center fw-bold ${
-                                errors.code && touched.code ? "is-invalid" : ""
-                              }`}
-                              placeholder="000000"
-                              style={{ boxShadow: "none", letterSpacing: "0.5em" }}
-                            />
-                          </div>
-                          <ErrorMessage name="code" component="div" className="text-danger small mt-1" />
-
-                          {/* Resend Code */}
-                          <div className="text-center mt-2">
-                            {countdown > 0 ? (
-                              <small className="text-muted">Gửi lại mã sau {countdown}s</small>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={handleResendEmail}
-                                className="btn btn-link btn-sm p-0 text-decoration-none"
-                              >
-                                Gửi lại mã xác thực
-                              </button>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* New Password */}
-                        <div className="mb-3">
-                          <label htmlFor="newPassword" className="form-label fw-semibold">
-                            <i className="bi bi-lock me-2"></i>Mật khẩu mới
-                          </label>
-                          <div className="input-group">
-                            <span className="input-group-text bg-light border-end-0">
-                              <i className="bi bi-shield-lock text-muted"></i>
-                            </span>
-                            <Field
-                              id="newPassword"
-                              name="newPassword"
-                              type={showNewPassword ? "text" : "password"}
-                              className={`form-control border-start-0 border-end-0 ${
-                                errors.newPassword && touched.newPassword ? "is-invalid" : ""
-                              }`}
-                              placeholder="Nhập mật khẩu mới"
-                              style={{ boxShadow: "none" }}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowNewPassword(!showNewPassword)}
-                              className="btn btn-outline-secondary border-start-0"
-                              style={{ borderColor: "#dee2e6" }}
-                            >
-                              <i className={`bi ${showNewPassword ? "bi-eye-slash" : "bi-eye"} text-muted`}></i>
-                            </button>
-                          </div>
-                          <ErrorMessage name="newPassword" component="div" className="text-danger small mt-1" />
-                        </div>
-
-                        {/* Confirm Password */}
-                        <div className="mb-4">
-                          <label htmlFor="confirmPassword" className="form-label fw-semibold">
-                            <i className="bi bi-shield-check me-2"></i>Xác nhận mật khẩu
-                          </label>
-                          <div className="input-group">
-                            <span className="input-group-text bg-light border-end-0">
-                              <i className="bi bi-shield-check text-muted"></i>
-                            </span>
-                            <Field
-                              id="confirmPassword"
-                              name="confirmPassword"
-                              type={showConfirmPassword ? "text" : "password"}
-                              className={`form-control border-start-0 border-end-0 ${
-                                errors.confirmPassword && touched.confirmPassword ? "is-invalid" : ""
-                              }`}
-                              placeholder="Nhập lại mật khẩu mới"
-                              style={{ boxShadow: "none" }}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                              className="btn btn-outline-secondary border-start-0"
-                              style={{ borderColor: "#dee2e6" }}
-                            >
-                              <i className={`bi ${showConfirmPassword ? "bi-eye-slash" : "bi-eye"} text-muted`}></i>
-                            </button>
-                          </div>
-                          <ErrorMessage name="confirmPassword" component="div" className="text-danger small mt-1" />
-                        </div>
-
-                        {/* Submit Button */}
-                        <button
-                          type="submit"
-                          disabled={isSubmitting}
-                          className="btn btn-primary w-100 py-2 fw-semibold"
-                        >
-                          {isSubmitting ? (
-                            <>
-                              <span className="spinner-border spinner-border-sm me-2" role="status">
-                                <span className="visually-hidden">Loading...</span>
-                              </span>
-                              Đang đặt lại...
-                            </>
-                          ) : (
-                            <>
-                              <i className="bi bi-check-circle me-2"></i>
-                              Đặt lại mật khẩu
-                            </>
-                          )}
-                        </button>
-
-                        {/* Back Button */}
-                        <button
-                          type="button"
-                          onClick={() => setStep(1)}
-                          className="btn btn-outline-secondary w-100 mt-2"
-                        >
-                          <i className="bi bi-arrow-left me-2"></i>
-                          Quay lại
-                        </button>
-                      </Form>
-                    )}
-                  </Formik>
+                    {/* Instructions */}
+                    <div className="alert alert-info">
+                      <i className="bi bi-info-circle me-2"></i>
+                      <small>
+                        <strong>Lưu ý:</strong> Hãy thay đổi mật khẩu ngay sau khi đăng nhập để bảo mật tài khoản
+                      </small>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
@@ -357,7 +148,7 @@ export const ForgotPasswordForm = () => {
             {/* Back to Login Link */}
             <div className="text-center mt-4">
               <p className="text-muted mb-0">
-                Nhớ mật khẩu rồi?{" "}
+                {isSuccess ? "Đã có mật khẩu mới?" : "Nhớ mật khẩu rồi?"}{" "}
                 <Link to="/auth/signin" className="text-decoration-none fw-semibold">
                   <i className="bi bi-arrow-left me-1"></i>
                   Quay về đăng nhập
