@@ -11,12 +11,10 @@ const {
 
 const client = new OAuth2Client(env.VITE_GOOGLE_CLIENT_ID);
 
-// Tạo OTP 6 số
 const generateOTP = () => {
     return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// Gửi OTP đến email
 const sendOTP = async (req, res) => {
     try {
         const { email } = req.body;
@@ -145,12 +143,6 @@ const signup = async (req, res) => {
             name,
             email,
             password: myEncPassword,
-            address: {
-                street: '',
-                city: '',
-                country: '',
-            },
-            phone: '',
             picture: '',
             status: 'Active',
             role: 'user',
@@ -158,13 +150,6 @@ const signup = async (req, res) => {
 
         // Xóa OTP sau khi đăng ký thành công
         await OTP.deleteOne({ _id: otpRecord._id });
-
-        // Tạo token
-        const token = jwt.sign(
-            { userId: user._id, email: user.email },
-            env.JWT_SECRET,
-            { expiresIn: env.ACCESS_TOKEN_EXPIRY }
-        );
 
         // Tạo object user để trả về (không bao gồm password)
         const userResponse = {
@@ -175,10 +160,7 @@ const signup = async (req, res) => {
             phone: user.phone,
             picture: user.picture,
             status: user.status,
-            role: user.role,
-            token: token,
-            createdAt: user.createdAt,
-            updatedAt: user.updatedAt
+            role: user.role
         };
 
         res.status(StatusCodes.CREATED).json({
@@ -197,7 +179,6 @@ const signup = async (req, res) => {
     }
 };
 
-// Xác thực OTP (nếu cần endpoint riêng)
 const verifyOTP = async (req, res) => {
     try {
         const { email, otp } = req.body;
@@ -289,12 +270,6 @@ const signupGoogle = async (req, res) => {
             email,
             googleId,
             password: '',
-            address: {
-                street: '',
-                city: '',
-                country: '',
-            },
-            phone: '',
             picture: picture || '',
             status: 'Active',
             role: 'user',
@@ -311,8 +286,6 @@ const signupGoogle = async (req, res) => {
             picture: newUser.picture,
             status: newUser.status,
             role: newUser.role,
-            createdAt: newUser.createdAt,
-            updatedAt: newUser.updatedAt
         };
 
         res.status(StatusCodes.CREATED).json({
@@ -403,7 +376,7 @@ const signinGoogle = async (req, res) => {
         // Verify the ID token with Google
         const ticket = await client.verifyIdToken({
             idToken: idToken,
-            audience: env.GOOGLE_CLIENT_ID,
+            audience: env.VITE_GOOGLE_CLIENT_ID,
         });
 
         const { email, name, picture, sub: googleId } = ticket.getPayload();
@@ -412,21 +385,10 @@ const signinGoogle = async (req, res) => {
         let user = await Users.findOne({ email });
 
         if (!user) {
-            // Create new user if not exists
-            user = await Users.create({
-                name,
-                email,
-                googleId,
-                password: '',
-                address: {
-                    street: '',
-                    city: '',
-                    country: '',
-                },
-                phone: '',
-                picture: picture || '',
-                status: 'Active',
-                role: 'user',
+            // Không tạo tài khoản mới, trả về lỗi
+            return res.status(StatusCodes.UNAUTHORIZED).json({
+                success: false,
+                message: 'Tài khoản chưa được đăng ký trong hệ thống.',
             });
         }
 

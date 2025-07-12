@@ -45,7 +45,7 @@ export const LoginForm = () => {
 
                 // Redirect tới trang chính hoặc dashboard
                 setTimeout(() => {
-                    navigate('/home') // hoặc trang bạn muốn redirect
+                    navigate('/home/contact') // hoặc trang bạn muốn redirect
                 }, 1000)
 
             } else {
@@ -82,7 +82,7 @@ export const LoginForm = () => {
 
                 // Redirect
                 setTimeout(() => {
-                    navigate('/home')
+                    navigate('/home/contact')
                 }, 1000)
             } else {
                 toast.error(response.data?.message || "Đăng ký Google thất bại")

@@ -116,15 +116,9 @@ export const SignupForm = () => {
         toast.success(response.data.message, {
           duration: 3000,
         })
-
-        // Lưu thông tin user vào sessionStorage hoặc context nếu cần
-        if (response.data.user) {
-          sessionStorage.setItem('token', response.data.user.token)
-        }
-
         // Redirect tới trang chính hoặc home
         setTimeout(() => {
-          navigate('/home') // hoặc trang bạn muốn redirect
+          navigate('/auth/signin') // hoặc trang bạn muốn redirect
         }, 1000)
 
       } else {
@@ -191,14 +185,9 @@ export const SignupForm = () => {
           duration: 3000,
         })
 
-        // Lưu thông tin user nếu cần
-        if (response.data.user) {
-          localStorage.setItem('user', JSON.stringify(response.data.user))
-        }
-
         // Redirect
         setTimeout(() => {
-          navigate('/home') // hoặc trang bạn muốn redirect
+          navigate('/auth/signin') // hoặc trang bạn muốn redirect
         }, 1000)
       } else {
         toast.error(response.data?.message || "Đăng ký Google thất bại")
