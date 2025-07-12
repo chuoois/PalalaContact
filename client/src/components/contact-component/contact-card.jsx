@@ -21,10 +21,14 @@ export const ContactCard = ({ data, onViewDetails, onToggleFavorite, onDelete, o
               <div className="d-flex align-items-center gap-2">
                 <h3 className="fw-semibold text-dark mb-0 fs-4">{fullName}</h3>
                 <i
-                  className={`bi bi-${
-                    category === "work" ? "briefcase-fill" : category === "friends" ? "person-hearts" : "folder-fill"
-                  } text-muted`}
-                ></i>
+                  className={`bi bi-${category === "work" ? "briefcase-fill" :
+                      category === "friends" ? "person-hearts" :
+                        category === "family" ? "house-heart-fill" :
+                          category === "business" ? "building-fill" :
+                            category === "other" ? "folder-fill" :
+                              "people-fill"
+                    } text-muted`}
+                />
                 {isFavorite && <i className="bi bi-star-fill text-warning"></i>}
               </div>
               <span className={`badge ${status === "Active" ? "bg-success" : status === "Archived" ? "bg-warning" : "bg-danger"}`}>
