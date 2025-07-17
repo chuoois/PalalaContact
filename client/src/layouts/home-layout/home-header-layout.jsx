@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { jwtDecode } from "jwt-decode"
 
 export const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -7,6 +8,9 @@ export const Header = () => {
     sessionStorage.removeItem("token")
     window.location.href = "/"
   }
+
+  const user = jwtDecode(sessionStorage.getItem("token"));
+  console.log(user);
 
   return (
     <>
@@ -47,7 +51,7 @@ export const Header = () => {
                   >
                     <i className="bi bi-person-fill text-white"></i>
                   </div>
-                  <span className="fw-medium text-dark">Nguyễn Văn A</span>
+                  <span className="fw-medium text-dark">{user.email}</span>
                 </button>
                 <ul className="dropdown-menu dropdown-menu-end">
                   <li>

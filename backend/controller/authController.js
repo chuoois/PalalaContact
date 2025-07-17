@@ -326,25 +326,10 @@ const signin = async (req, res) => {
                 { expiresIn: env.ACCESS_TOKEN_EXPIRY }
             );
 
-            // Tạo object user để trả về (không bao gồm password)
-            const userResponse = {
-                _id: user._id,
-                name: user.name,
-                email: user.email,
-                address: user.address,
-                phone: user.phone,
-                picture: user.picture,
-                status: user.status,
-                role: user.role,
-                token: token,
-                createdAt: user.createdAt,
-                updatedAt: user.updatedAt
-            };
-
             res.status(StatusCodes.OK).json({
                 success: true,
                 message: 'Đăng nhập thành công',
-                user: userResponse,
+                user: token,
             });
         } else {
             res.status(StatusCodes.UNAUTHORIZED).json({
@@ -399,25 +384,10 @@ const signinGoogle = async (req, res) => {
             { expiresIn: env.ACCESS_TOKEN_EXPIRY }
         );
 
-        // Tạo object user để trả về (không bao gồm password)
-        const userResponse = {
-            _id: user._id,
-            name: user.name,
-            email: user.email,
-            address: user.address,
-            phone: user.phone,
-            picture: user.picture,
-            status: user.status,
-            role: user.role,
-            token: token,
-            createdAt: user.createdAt,
-            updatedAt: user.updatedAt
-        };
-
         res.status(StatusCodes.OK).json({
             success: true,
             message: 'Đăng nhập Google thành công',
-            user: userResponse,
+            user: token,
         });
 
     } catch (error) {

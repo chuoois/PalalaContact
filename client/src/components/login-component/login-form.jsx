@@ -40,7 +40,7 @@ export const LoginForm = () => {
 
                 // Lưu thông tin user vào sessionStorage hoặc context nếu cần
                 if (response.data.user) {
-                    sessionStorage.setItem('token', response.data.user.token)
+                    sessionStorage.setItem('token', response.data.user)
                 }
 
                 // Redirect tới trang chính hoặc dashboard
@@ -67,6 +67,7 @@ export const LoginForm = () => {
             const loadingToast = toast.loading("Đang đăng nhập với Google...")
 
             const response = await authService.signinGoogle(credentialResponse.credential)
+            console.log(response)
 
             toast.dismiss(loadingToast)
 
@@ -77,7 +78,7 @@ export const LoginForm = () => {
 
                 // Lưu thông tin user nếu cần
                 if (response.data.user) {
-                    sessionStorage.setItem('token', response.data.user.token)
+                    sessionStorage.setItem('token', response.data.user)
                 }
 
                 // Redirect
